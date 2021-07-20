@@ -1,0 +1,123 @@
+#start with our base 7.2 base
+FROM php:7.2-apache-buster
+
+LABEL org.label-schema.vcs-url="https://github.com/diakogiannis/dockerfiles" \
+      org.label-schema.schema-version="1.0" \
+      org.label-schema.vendor="Diakogiannis" \
+      org.label-schema.name="docker-php-apache" \
+      org.label-schema.description="Docker For PHP Running in a server with PHP 7.2, Apache, and Debian Buster" \
+      org.label-schema.url="https://github.com/diakogiannis/dockerfiles"
+
+#install ca-certificates, wget, curl, zlib1g-dev, libssl-dev
+RUN  apt-get update \
+     &&  apt-get -y install ca-certificates \
+                            wget \
+                            curl \
+                            zlib1g-dev \
+                            libzip-dev \
+                            libssl-dev  \ 
+                            autoconf \
+                            automake \
+                            libtool \
+                            ffmpeg   \
+                            libprotobuf-dev \
+                            libboost-dev \
+                            openssl \
+                            protobuf-compiler \
+                            libcurl4-openssl-dev \
+                            &&  update-ca-certificates
+#prepare imagix
+RUN apt-get update && apt-get install -y libmagickwand-dev --no-install-recommends && rm -rf /var/lib/apt/lists/*
+RUN printf "\n" | pecl install imagick
+
+#install all the system dependencies and enable PHP modules 
+RUN apt-get update && apt-get install -y \
+      libicu-dev \
+      libpq-dev \
+      libmcrypt-dev \
+      git \
+      zip \
+      unzip \
+    && rm -r /var/lib/apt/lists/* \
+    && docker-php-ext-configure pdo_mysql --with-pdo-mysql=mysqlnd 
+#because of a bug in docker-php-ext-install I need to run it multiple times    
+RUN docker-php-ext-install intl 
+RUN docker-php-ext-install mbstring 
+RUN docker-php-ext-install pcntl 
+RUN docker-php-ext-install pdo_mysql 
+RUN docker-php-ext-install pdo_pgsql 
+RUN docker-php-ext-install pgsql 
+RUN docker-php-ext-install zip 
+RUN docker-php-ext-install gettext 
+RUN docker-php-ext-install bcmath 
+RUN docker-php-ext-install calendar 
+RUN docker-php-ext-install exif 
+RUN docker-php-ext-install ftp 
+RUN docker-php-ext-install opcache 
+RUN docker-php-ext-install sysvsem 
+RUN docker-php-ext-install sysvshm 
+RUN docker-php-ext-install sysvmsg 
+RUN docker-php-ext-install shmop 
+RUN docker-php-ext-install phar 
+RUN docker-php-ext-install sockets 
+RUN docker-php-ext-install bz2 
+RUN docker-php-ext-install curl 
+RUN docker-php-ext-install simplexml 
+RUN docker-php-ext-install xml 
+RUN docker-php-ext-install dom 
+RUN docker-php-ext-install tokenizer 
+RUN docker-php-ext-install ctype 
+RUN docker-php-ext-install session 
+RUN docker-php-ext-install fileinfo 
+RUN docker-php-ext-install iconv 
+RUN docker-php-ext-install json 
+RUN docker-php-ext-install posix 
+RUN docker-php-ext-install curl 
+RUN docker-php-ext-install gd
+
+#enable imagik
+RUN docker-php-ext-enable imagick
+
+RUN apt-get install -y libzip-dev && docker-php-ext-configure zip --with-libzip
+
+RUN rm /etc/apt/preferences.d/no-debian-php
+
+#enablesqli
+RUN docker-php-ext-install mysqli
+RUN docker-php-ext-enable mysqli
+      
+#uncomment this to install composer
+#RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin/ --filename=composer
+
+#set our application folder as an environment variable
+ENV APP_HOME /var/www/html
+
+#change uid and gid of apache to docker user uid/gid
+RUN usermod -u 1000 www-data && groupmod -g 1000 www-data
+
+# enable apache module rewrite
+RUN a2enmod rewrite
+
+# Enable "mod_headers" – http://httpd.apache.org/docs/current/mod/mod_headers.html
+RUN a2enmod headers
+
+# Enable "mod_expires" – http://httpd.apache.org/docs/current/mod/mod_expires.html
+RUN a2enmod expires
+
+
+#uncomment this copy source files 
+#COPY . $APP_HOME
+
+# uncomment this to install all PHP dependencies
+#RUN composer install --no-interaction
+
+#change ownership of our applications
+RUN chown -R www-data:www-data $APP_HOME
+
+#enable php production
+RUN mv /usr/local/etc/php/php.ini-production /usr/local/etc/php/php.ini
+
+#utc fix
+RUN sed -i "s/;date.timezone =.*/date.timezone = UTC/" /usr/local/etc/php/php.ini
+
+RUN chown -R www-data:www-data /var/www/*
